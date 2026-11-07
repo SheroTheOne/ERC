@@ -11,8 +11,7 @@
     "test:integration": "vitest run --project integration",
     "db:migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
     "db:seed": "node --env-file-if-exists=.env db/seed/seed.ts",
-    "db:codegen": "kysely-codegen --dialect postgres --camel-case --default-schema erc --include-pattern 'erc.*' --date-parser string --type-mapping '{\"timestamptz\":\"string\",\"tstzrange\":\"string\",\"citext\":\"string\"}' --out-file src/db/types.ts",
-    "db:codegen:verify": "kysely-codegen --dialect postgres --camel-case --default-schema erc --include-pattern 'erc.*' --date-parser string --type-mapping '{\"timestamptz\":\"string\",\"tstzrange\":\"string\",\"citext\":\"string\"}' --out-file src/db/types.ts --verify"
+    "db:codegen": "kysely-codegen --dialect postgres --camel-case --default-schema erc --include-pattern 'erc.*' --date-parser string --type-mapping '{\"timestamptz\":\"string\",\"tstzrange\":\"string\",\"citext\":\"string\"}' --out-file src/db/types.ts"
   },
   "dependencies": {
     "@erc/contracts": "0.0.0",
