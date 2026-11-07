@@ -55,7 +55,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run test:integration
+      # github-actions-reportern gör varje testfel till en annotering i PR:en.
+      - run: npm run test:integration -- --reporter=default --reporter=github-actions
       - name: Genererade databastyper stämmer med migreringarna
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/erc_codegen
