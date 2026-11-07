@@ -4,7 +4,7 @@ Ett boknings- och kundhanteringssystem för små tjänsteföretag, till exempel 
 
 Projektet är ett portfolioprojekt med fokus på det som är svårt i riktiga system: datamodellering, samtidighet, behörigheter, tester och driftsättning.
 
-> **Status:** Fas 2 (bokningskärnan) är klar: lediga tider, bokning med idempotens, avbokning och samtidighetstester mot PostgreSQL 18. Inloggning och roller byggs i Fas 3. Designbeslut finns i [`docs/`](docs/).
+> **Status:** Fas 3 (inloggning och administration) är klar: sessioner, roller, personal, scheman, kunder och en behörighetsmatris som testar varje route. Gränssnittet byggs i Fas 4. Designbeslut finns i [`docs/`](docs/).
 
 ## Mål
 
@@ -89,7 +89,7 @@ npm ci
 cp apps/api/.env.example apps/api/.env
 npm run db:up                    # bara databasen
 npm run db:migrate
-npm run db:seed                  # påhittad demodata
+npm run db:seed                  # påhittad demodata, inloggning: alva@erc.example / erc-demo-2026
 npm run dev                      # API på :3000, webb på http://localhost:5173
 ```
 
@@ -130,8 +130,8 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 
 ### Fas 3: Inloggning och administration
 
-- [ ] Lägg till inloggning och roller
-- [ ] Bygg API för kunder, personal och arbetstider
+- [x] Lägg till inloggning och roller
+- [x] Bygg API för kunder, personal och arbetstider
 
 **Klart när:** tester visar att varje roll bara kommer åt det den ska.
 

@@ -105,6 +105,7 @@ Svaret på `POST /time-off` innehåller `conflicts[]`: aktiva bokningar som nu l
 
 | Metod | Sökväg | Roll |
 | --- | --- | --- |
+| GET | `/services/all` (även inaktiva, med buffert) | personal |
 | POST, PATCH | `/services`, `/services/{id}` | admin |
 | GET | `/customers`, `/customers/{id}` | personal |
 | GET | `/customers/{id}/export` | admin |
@@ -137,6 +138,8 @@ Alla fel har `type`, `title`, `status`, `detail`, `instance` och `requestId`. `t
 | `staff-inactive` | 409 | `booking_staff_active` |
 | `cancellation-window-closed` | 409 | Kunden försöker avboka för sent |
 | `schedule-overlap` | 409 | `working_hours_no_overlap` |
+| `already-exists` | 409 | E-postadressen används redan (`app_user_email_key`) |
+| `booking-not-active` | 409 | Status- eller tidsändring på en bokning som inte är bekräftad |
 | `staff-does-not-perform-service` | 422 | `booking_staff_performs_service` |
 | `idempotency-key-reused` | 422 | Samma nyckel med annat innehåll |
 | `idempotency-key-required` | 428 | Headern saknas på `POST /bookings` |
