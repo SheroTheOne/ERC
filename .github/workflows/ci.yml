@@ -74,7 +74,12 @@ jobs:
         run: |
           psql "$TEST_DATABASE_URL" -c 'CREATE DATABASE erc_codegen'
           npm run db:migrate
-          npm run db:codegen:verify
+          npm run db:codegen
+          if ! git diff --exit-code -- apps/api/src/db/types.ts > types.diff; then
+            message=$(sed 's/%/%25/g' types.diff | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error file=apps/api/src/db/types.ts,title=Genererade typer är inaktuella (kör npm run db:codegen)::${message}"
+            exit 1
+          fi
 
   docker:
     name: Docker Compose startar och svarar
