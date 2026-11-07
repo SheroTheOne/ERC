@@ -4,7 +4,7 @@ Ett boknings- och kundhanteringssystem för små tjänsteföretag, till exempel 
 
 Projektet är ett portfolioprojekt med fokus på det som är svårt i riktiga system: datamodellering, samtidighet, behörigheter, tester och driftsättning.
 
-> **Status:** Planering. Ingen kod är skriven än. Planen nedan uppdateras under projektets gång.
+> **Status:** Fas 0 (design) är i stort sett klar: arkitekturbeslut, datamodell, API-utkast och vyskisser finns i [`docs/`](docs/). Ingen applikationskod är skriven än.
 
 ## Mål
 
@@ -34,105 +34,54 @@ Projektet är ett portfolioprojekt med fokus på det som är svårt i riktiga sy
 
 ## Research
 
-Varje fråga avslutas med ett kort beslut i `docs/decisions/`.
+Varje fråga avslutas med ett kort beslut i [`docs/decisions/`](docs/decisions/).
 
 | Område | Fråga | Utgångspunkt |
 | --- | --- | --- |
-| Liknande system | Hur fungerar flödena i Calendly, Cal.com och Bokadirekt? | Lista vad som ska efterliknas och vad som kan väljas bort |
-| Dubbelbokning | Hur stoppas krockar när två personer bokar samtidigt? | PostgreSQL-constraint med `EXCLUDE` på tidsintervall |
-| Tid och datum | Hur hanteras tidszoner och sommartid? | Lagra i UTC, visa i företagets tidszon |
-| Tillgänglighet | Hur räknas lediga tider ut från arbetstider, frånvaro och bokningar? | Beräkna vid förfrågan, ingen lagring av färdiga tidsluckor |
-| Inloggning | Sessioner eller JWT, eget eller färdigt bibliotek? | Sessionscookies med ett beprövat bibliotek |
-| Personuppgifter | Vad kräver GDPR för kunddata? | Samla in minimalt, stöd för export och radering |
-| Driftsättning | Var kan demon köras billigt? | Jämför Fly.io, Railway och Render |
+| Liknande system | Hur fungerar flödena i Calendly, Cal.com och Bokadirekt? | Öppen |
+| Dubbelbokning | Hur stoppas krockar när två personer bokar samtidigt? | `EXCLUDE` på blockerad tid inklusive buffert, idempotensnycklar ([ADR-0003](docs/decisions/0003-dubbelbokning-och-samtidighet.md)) |
+| Tid och datum | Hur hanteras tidszoner och sommartid? | Arbetstider i väggklocka, allt annat i `timestamptz` ([ADR-0004](docs/decisions/0004-tid-och-tidszoner.md)) |
+| Tillgänglighet | Hur räknas lediga tider ut från arbetstider, frånvaro och bokningar? | Multiranges i SQL och tidsluckor i en ren funktion ([ADR-0005](docs/decisions/0005-tillganglighetsmotor.md)) |
+| Inloggning | Sessioner eller JWT, eget eller färdigt bibliotek? | Egna sessioner i PostgreSQL, eftersom Lucia inte längre utvecklas ([ADR-0008](docs/decisions/0008-autentisering-och-behorighet.md)) |
+| Personuppgifter | Vad kräver GDPR för kunddata? | Minimal insamling, export och anonymisering ([ADR-0010](docs/decisions/0010-personuppgifter.md)) |
+| Driftsättning | Var kan demon köras billigt? | Öppen, avgörs i Fas 5 |
 
 ## Teknik
 
-Preliminärt val, som bekräftas eller ändras under researchen.
+Bekräftat i Fas 0. Motiveringarna finns i ADR:erna.
 
 | Del | Val | Motivering |
 | --- | --- | --- |
 | Språk | TypeScript | Samma språk och delade typer i frontend och backend |
-| Backend | Node.js med Fastify | Litet ramverk med inbyggd schemavalidering |
-| Databas | PostgreSQL | Transaktioner och stöd för constraints på tidsintervall |
+| Backend | Node.js 26 med Fastify, TypeBox och Kysely | Inbyggd schemavalidering, OpenAPI från koden och typade frågor ([ADR-0006](docs/decisions/0006-dataatkomst-och-migreringar.md), [ADR-0007](docs/decisions/0007-api-kontrakt-och-fel.md)) |
+| Databas | PostgreSQL 18 | Constraints på tidsintervall, multiranges och `uuidv7()` ([ADR-0002](docs/decisions/0002-postgresql-som-kalla-till-sanning.md)) |
 | Frontend | React med Vite | Stort ekosystem och enkel uppsättning |
-| Tester | Vitest och Playwright | Enhets- och integrationstester samt tester av hela flöden |
+| Tester | Vitest, Testcontainers och Playwright | Tester mot riktig PostgreSQL samt tester av hela flöden ([ADR-0009](docs/decisions/0009-teststrategi.md)) |
 | Drift | Docker och GitHub Actions | Samma miljö lokalt och i CI |
 
 ## Datamodell
 
-Första utkastet:
+Den fullständiga modellen, med ER-diagram och en tabell över vilka regler som garanteras av databasen, finns i [`docs/database/`](docs/database/). Schemautkastet [`schema.sql`](docs/database/schema.sql) har validerats mot PostgreSQL med kontroller för sommartid, buffert, avbokning och frånvaro.
 
-```mermaid
-erDiagram
-    CUSTOMER ||--o{ BOOKING : gör
-    SERVICE ||--o{ BOOKING : avser
-    STAFF ||--o{ BOOKING : utför
-    STAFF ||--o{ WORKING_HOURS : har
-    STAFF ||--o{ TIME_OFF : har
-
-    CUSTOMER {
-        uuid id PK
-        text name
-        text email
-        text phone
-    }
-    SERVICE {
-        uuid id PK
-        text name
-        int duration_minutes
-        int price_ore
-    }
-    STAFF {
-        uuid id PK
-        text name
-        text email
-        text role
-    }
-    BOOKING {
-        uuid id PK
-        uuid customer_id FK
-        uuid service_id FK
-        uuid staff_id FK
-        timestamptz starts_at
-        timestamptz ends_at
-        text status
-    }
-    WORKING_HOURS {
-        uuid id PK
-        uuid staff_id FK
-        int weekday
-        time starts_at
-        time ends_at
-    }
-    TIME_OFF {
-        uuid id PK
-        uuid staff_id FK
-        timestamptz starts_at
-        timestamptz ends_at
-    }
-```
-
-Dubbelbokningar stoppas av databasen, även om två förfrågningar kommer in samtidigt:
+Kärnan är att dubbelbokningar stoppas av databasen, även om två förfrågningar kommer in samtidigt. Constraintet gäller den tid personalen är upptagen *inklusive* buffert, och den tiden räknas ut av en trigger:
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-
-ALTER TABLE booking ADD CONSTRAINT no_overlapping_bookings
-  EXCLUDE USING gist (
-    staff_id WITH =,
-    tstzrange(starts_at, ends_at) WITH &&
-  ) WHERE (status <> 'cancelled');
+CONSTRAINT booking_no_overlap EXCLUDE USING gist (
+  staff_id WITH =,
+  blocked WITH &&
+) WHERE (status <> 'cancelled')
 ```
+
+En översikt över arkitektur och mappstruktur finns i [`docs/architecture.md`](docs/architecture.md).
 
 ## Plan
 
 ### Fas 0: Research och design
 
-- [ ] Gå igenom researchfrågorna och skriv ner besluten
-- [ ] Fastställ MVP och datamodell
-- [ ] Skissa de viktigaste vyerna
-- [ ] Skriv en första API-specifikation
+- [ ] Gå igenom researchfrågorna och skriv ner besluten (kvar: liknande system och driftsättning)
+- [x] Fastställ MVP och datamodell
+- [x] Skissa de viktigaste vyerna
+- [x] Skriv en första API-specifikation
 
 **Klart när:** alla preliminära val är bekräftade eller ändrade.
 
