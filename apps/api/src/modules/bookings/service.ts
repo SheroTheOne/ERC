@@ -48,6 +48,14 @@ const ACCESS_TOKEN_LIFETIME_DAYS = 30;
 const STAFF_UNAVAILABLE = new Set(['booking_no_overlap', 'booking_within_open_hours']);
 
 /**
+ * Samtidiga INSERT som krockar i ett EXCLUDE-index kan vänta på varandra och
+ * avbrytas med deadlock i stället för 23P01 (ADR-0012). Försöket görs då om i
+ * samma savepoint och väntar på den transaktion som överlevde.
+ */
+const DEADLOCK_DETECTED = '40P01';
+const MAX_ATTEMPTS_PER_STAFF = 5;
+
+/**
  * Skapar en bokning (ADR-0003). Allt sker i en transaktion:
  * idempotensnyckeln låses, policy kontrolleras, kunden kopplas, personal prövas
  * en i taget i egna savepoints och svaret sparas tillsammans med bokningen.
@@ -167,18 +175,21 @@ async function insertFirstAvailable(
   booking: Omit<NewBooking, 'staffId'>,
 ): Promise<string> {
   for (const staffId of staffIds) {
-    await sql`SAVEPOINT booking_attempt`.execute(trx);
-    try {
-      const id = await insertBooking(trx, { ...booking, staffId });
-      await sql`RELEASE SAVEPOINT booking_attempt`.execute(trx);
-      return id;
-    } catch (error) {
-      await sql`ROLLBACK TO SAVEPOINT booking_attempt`.execute(trx);
-      const staffUnavailable =
-        error instanceof pg.DatabaseError &&
-        error.constraint !== undefined &&
-        STAFF_UNAVAILABLE.has(error.constraint);
-      if (!tryNextOnConflict || !staffUnavailable) throw error;
+    for (let attempt = 1; ; attempt++) {
+      await sql`SAVEPOINT booking_attempt`.execute(trx);
+      try {
+        const id = await insertBooking(trx, { ...booking, staffId });
+        await sql`RELEASE SAVEPOINT booking_attempt`.execute(trx);
+        return id;
+      } catch (error) {
+        await sql`ROLLBACK TO SAVEPOINT booking_attempt`.execute(trx);
+        if (!(error instanceof pg.DatabaseError)) throw error;
+        if (error.code === DEADLOCK_DETECTED && attempt < MAX_ATTEMPTS_PER_STAFF) continue;
+        const staffUnavailable =
+          error.constraint !== undefined && STAFF_UNAVAILABLE.has(error.constraint);
+        if (!tryNextOnConflict || !staffUnavailable) throw error;
+        break;
+      }
     }
   }
   throw new ProblemError('slot-unavailable', 409, {

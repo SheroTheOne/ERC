@@ -29,6 +29,10 @@ describe('toProblem', () => {
     });
   });
 
+  it('maps a deadlock that survived the retries to 503, never 500', () => {
+    expect(toProblem(databaseError('40P01')).status).toBe(503);
+  });
+
   it('maps a lost database connection to 503', () => {
     expect(toProblem(databaseError('57P01')).status).toBe(503);
   });

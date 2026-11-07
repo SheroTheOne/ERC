@@ -67,6 +67,7 @@ const SQLSTATE = {
   connectionFailure: '08006',
   cannotConnectNow: '57P03',
   adminShutdown: '57P01',
+  deadlockDetected: '40P01',
 } as const;
 
 export function problemFromDatabaseError(error: pg.DatabaseError): ProblemError | undefined {
@@ -79,6 +80,14 @@ export function problemFromDatabaseError(error: pg.DatabaseError): ProblemError 
     return mapped === undefined
       ? undefined
       : new ProblemError(mapped[0], mapped[1], { cause: error });
+  }
+  // Bokningar gör om försök vid deadlock (ADR-0012). Når felet ändå hit är det
+  // tillfälligt, och klienten kan försöka igen med samma idempotensnyckel.
+  if (code === SQLSTATE.deadlockDetected) {
+    return new ProblemError('service-unavailable', 503, {
+      detail: 'Förfrågan krockade med en annan. Försök igen.',
+      cause: error,
+    });
   }
   if (
     code === SQLSTATE.connectionFailure ||

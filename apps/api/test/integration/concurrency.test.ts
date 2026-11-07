@@ -135,15 +135,25 @@ describe(`${CONTENDERS} concurrent bookings of the same slot`, () => {
             } catch (error) {
               await client.query('ROLLBACK');
               return error instanceof pg.DatabaseError
-                ? `${error.code} ${error.constraint ?? ''}`
+                ? `${error.code ?? ''} ${error.constraint ?? ''}`.trim()
                 : 'other';
             }
           }),
         ),
       );
 
-      expect(outcomes.filter((o) => o === 'committed')).toHaveLength(1);
-      expect(outcomes.filter((o) => o === '23P01 booking_no_overlap')).toHaveLength(CONTENDERS - 1);
+      // Utan applikationslogik kan förlorarna få antingen 23P01 eller deadlock (40P01):
+      // samtidiga INSERT i ett EXCLUDE-index kan vänta på varandra (ADR-0012).
+      // Det som måste gälla är att exakt en vinner och att inget annat fel uppstår.
+      const tally = Object.fromEntries(
+        [...new Set(outcomes)].map((o) => [o, outcomes.filter((x) => x === o).length]),
+      );
+      expect(tally['committed'], JSON.stringify(tally)).toBe(1);
+      const losers = outcomes.filter((o) => o !== 'committed');
+      expect(
+        losers.every((o) => o === '23P01 booking_no_overlap' || o === '40P01'),
+        JSON.stringify(tally),
+      ).toBe(true);
       expect(await activeAt(SLOT.startsAt)).toEqual([{ staffId: anna }]);
     } finally {
       await Promise.all(clients.map((client) => client.end()));
