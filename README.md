@@ -4,7 +4,7 @@ Ett boknings- och kundhanteringssystem för små tjänsteföretag, till exempel 
 
 Projektet är ett portfolioprojekt med fokus på det som är svårt i riktiga system: datamodellering, samtidighet, behörigheter, tester och driftsättning.
 
-> **Status:** Fas 1 (projektgrund) är klar: monorepo, migreringar, testdata, tester och CI. Bokningskärnan byggs i Fas 2. Designbeslut finns i [`docs/`](docs/).
+> **Status:** Fas 2 (bokningskärnan) är klar: lediga tider, bokning med idempotens, avbokning och samtidighetstester mot PostgreSQL 18. Inloggning och roller byggs i Fas 3. Designbeslut finns i [`docs/`](docs/).
 
 ## Mål
 
@@ -121,10 +121,10 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 
 ### Fas 2: Bokningskärnan
 
-- [ ] Skapa tabeller och constraint för bokningar
-- [ ] Bygg API för tjänster och bokningar
-- [ ] Beräkna lediga tider
-- [ ] Testa samtidiga bokningar, sommartid och avbokning
+- [x] Skapa tabeller och constraint för bokningar
+- [x] Bygg API för tjänster och bokningar
+- [x] Beräkna lediga tider
+- [x] Testa samtidiga bokningar, sommartid och avbokning
 
 **Klart när:** ett test med parallella bokningar av samma tid ger exakt en lyckad bokning.
 
