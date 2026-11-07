@@ -158,14 +158,16 @@ export async function hasValidAccessToken(
   return row !== undefined;
 }
 
-export async function findBooking(db: Executor, id: string): Promise<Booking | undefined> {
-  const row = await db
+/** Gemensam fråga för bokningar, så att alla svar har samma form. */
+function selectBookings(db: Executor) {
+  return db
     .selectFrom('booking')
     .innerJoin('service', 'service.id', 'booking.serviceId')
     .innerJoin('staff', 'staff.id', 'booking.staffId')
     .select([
       'booking.id',
       'booking.status',
+      'booking.customerId',
       'booking.serviceId',
       'service.name as serviceName',
       'booking.staffId',
@@ -174,31 +176,111 @@ export async function findBooking(db: Executor, id: string): Promise<Booking | u
       'booking.endsAt',
       'booking.priceOre',
       'booking.contactName',
+      'booking.contactPhone',
       'booking.cancelledAt',
-    ])
-    .where('booking.id', '=', id)
-    .executeTakeFirst();
-  if (row === undefined) return undefined;
+    ]);
+}
+
+type BookingRow = Omit<Booking, 'status'> & { status: string };
+
+function toBooking(row: BookingRow): Booking {
   return { ...row, status: toBookingStatus(row.status) };
+}
+
+export async function isOwnedBy(
+  db: Executor,
+  bookingId: string,
+  customerId: string,
+): Promise<boolean> {
+  const row = await db
+    .selectFrom('booking')
+    .select('id')
+    .where('id', '=', bookingId)
+    .where('customerId', '=', customerId)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+export async function findBooking(db: Executor, id: string): Promise<Booking | undefined> {
+  const row = await selectBookings(db).where('booking.id', '=', id).executeTakeFirst();
+  return row === undefined ? undefined : toBooking(row);
+}
+
+export interface BookingFilter {
+  readonly ids?: readonly string[];
+  readonly customerId?: string;
+  readonly staffId?: string;
+  readonly status?: BookingStatus;
+  /** Bokningar som börjar inom [from, to). */
+  readonly from?: string;
+  readonly to?: string;
+}
+
+export async function listBookings(db: Executor, filter: BookingFilter): Promise<Booking[]> {
+  let query = selectBookings(db);
+  if (filter.ids !== undefined) {
+    if (filter.ids.length === 0) return [];
+    query = query.where('booking.id', 'in', filter.ids);
+  }
+  if (filter.customerId !== undefined)
+    query = query.where('booking.customerId', '=', filter.customerId);
+  if (filter.staffId !== undefined) query = query.where('booking.staffId', '=', filter.staffId);
+  if (filter.status !== undefined) query = query.where('booking.status', '=', filter.status);
+  if (filter.from !== undefined) query = query.where('booking.startsAt', '>=', filter.from);
+  if (filter.to !== undefined) query = query.where('booking.startsAt', '<', filter.to);
+  const rows = await query.orderBy('booking.startsAt').orderBy('booking.id').execute();
+  return rows.map(toBooking);
+}
+
+/**
+ * Aktiva bokningar från och med `from` som inte längre ligger inom personalens
+ * öppna tid, efter ny frånvaro eller ändrade arbetstider (ADR-0002).
+ */
+export async function findConflicts(
+  db: Executor,
+  input: { from: string; staffId?: string },
+): Promise<Booking[]> {
+  const { rows } = await sql<{ id: string }>`
+    SELECT b.id
+    FROM booking b
+    WHERE b.status = 'confirmed'
+      AND upper(b.blocked) > ${input.from}::timestamptz
+      ${input.staffId === undefined ? sql`` : sql`AND b.staff_id = ${input.staffId}`}
+      AND NOT (b.blocked <@ staff_open_periods(b.staff_id, b.blocked))
+  `.execute(db);
+  return listBookings(db, { ids: rows.map((row) => row.id) });
 }
 
 /** Låser bokningsraden för en statusändring, så att två avbokningar inte krockar. */
 export function lockBooking(
   db: Executor,
   id: string,
-): Promise<{ status: string; startsAt: string } | undefined> {
+): Promise<
+  | {
+      status: string;
+      startsAt: string;
+      endsAt: string;
+      staffId: string;
+      customerId: string;
+    }
+  | undefined
+> {
   return db
     .selectFrom('booking')
-    .select(['status', 'startsAt'])
+    .select(['status', 'startsAt', 'endsAt', 'staffId', 'customerId'])
     .where('id', '=', id)
     .forUpdate()
     .executeTakeFirst();
 }
 
-export async function markCancelled(db: Executor, id: string, at: string): Promise<void> {
+export async function markCancelled(
+  db: Executor,
+  id: string,
+  input: { at: string; by: string | null },
+): Promise<void> {
   await db
     .updateTable('booking')
-    .set({ status: 'cancelled', cancelledAt: at })
+    .set({ status: 'cancelled', cancelledAt: input.at, cancelledBy: input.by })
     .where('id', '=', id)
     .execute();
 }
@@ -209,6 +291,22 @@ export function parseStoredBooking(body: Json): Booking {
     throw new Error('Stored idempotent response does not match the Booking contract');
   }
   return body;
+}
+
+export async function setStatus(
+  db: Executor,
+  id: string,
+  status: 'completed' | 'no_show',
+): Promise<void> {
+  await db.updateTable('booking').set({ status }).where('id', '=', id).execute();
+}
+
+export async function moveBooking(
+  db: Executor,
+  id: string,
+  input: { staffId: string; startsAt: string; endsAt: string },
+): Promise<void> {
+  await db.updateTable('booking').set(input).where('id', '=', id).execute();
 }
 
 function toBookingStatus(status: string): BookingStatus {

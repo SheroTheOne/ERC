@@ -40,6 +40,7 @@ export const Booking = Type.Object(
   {
     id: Uuid,
     status: BookingStatus,
+    customerId: Uuid,
     serviceId: Uuid,
     serviceName: Type.String(),
     staffId: Uuid,
@@ -48,8 +49,42 @@ export const Booking = Type.Object(
     endsAt: Instant,
     priceOre: Type.Integer(),
     contactName: Type.String(),
+    contactPhone: Type.Union([Type.String(), Type.Null()]),
     cancelledAt: Type.Union([Instant, Type.Null()]),
   },
   { additionalProperties: false },
 );
 export type Booking = Static<typeof Booking>;
+
+export const BookingList = Type.Object(
+  { items: Type.Array(Booking) },
+  { additionalProperties: false },
+);
+export type BookingList = Static<typeof BookingList>;
+
+export const MAX_BOOKING_LIST_DAYS = 31;
+
+export const BookingListQuery = Type.Object(
+  {
+    from: Instant,
+    /** Exklusiv. Högst MAX_BOOKING_LIST_DAYS dagar efter `from`. */
+    to: Instant,
+    staffId: Type.Optional(Uuid),
+    status: Type.Optional(BookingStatus),
+  },
+  { additionalProperties: false },
+);
+export type BookingListQuery = Static<typeof BookingListQuery>;
+
+/** Personalens ändringar: status eller flytt. Invarianterna gäller alltid (ADR-0002). */
+export const UpdateBookingRequest = Type.Object(
+  {
+    status: Type.Optional(
+      Type.Union([Type.Literal('completed'), Type.Literal('no_show'), Type.Literal('cancelled')]),
+    ),
+    startsAt: Type.Optional(Instant),
+    staffId: Type.Optional(Uuid),
+  },
+  { additionalProperties: false, minProperties: 1 },
+);
+export type UpdateBookingRequest = Static<typeof UpdateBookingRequest>;

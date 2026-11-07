@@ -1,4 +1,4 @@
-import { seed } from '../../db/seed/seed.ts';
+import { DEMO_PASSWORD, seed } from '../../db/seed/seed.ts';
 import { buildApp, type AppInstance } from '../../src/app.ts';
 import { loadConfig } from '../../src/config.ts';
 import type { Clock } from '../../src/shared/clock.ts';
@@ -60,4 +60,54 @@ export async function createTestApp(
       await testDb.destroy();
     },
   };
+}
+
+export const ORIGIN = 'http://localhost';
+const SESSION_COOKIE = '__Host-erc_session';
+
+/** Headers för ett anrop som inloggad användare, med Origin så att CSRF-kontrollen godkänner det. */
+export function as(cookie: string | undefined): Record<string, string> {
+  return cookie === undefined ? {} : { cookie, origin: ORIGIN };
+}
+
+export function sessionCookie(response: {
+  cookies: readonly { name: string; value: string }[];
+}): string | undefined {
+  const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE && c.value !== '');
+  return cookie === undefined ? undefined : `${SESSION_COOKIE}=${cookie.value}`;
+}
+
+/** Loggar in personal eller administratör och returnerar cookie-headern. */
+export async function loginAs(
+  t: TestApp,
+  email: string,
+  password = DEMO_PASSWORD,
+): Promise<string> {
+  const response = await t.app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    payload: { email, password },
+  });
+  const cookie = sessionCookie(response);
+  if (response.statusCode !== 204 || cookie === undefined) {
+    throw new Error(`Login as ${email} failed with ${response.statusCode}: ${response.body}`);
+  }
+  return cookie;
+}
+
+/** Loggar in en befintlig kund via e-postlänken och returnerar cookie-headern. */
+export async function loginCustomer(t: TestApp, email: string): Promise<string> {
+  await t.app.inject({ method: 'POST', url: '/api/v1/auth/magic-link', payload: { email } });
+  const link = t.mailer.loginLinks.findLast((message) => message.to === email);
+  if (link === undefined) throw new Error(`No login link sent to ${email}`);
+  const response = await t.app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/magic-link/verify',
+    payload: { token: link.token },
+  });
+  const cookie = sessionCookie(response);
+  if (response.statusCode !== 204 || cookie === undefined) {
+    throw new Error(`Customer login for ${email} failed with ${response.statusCode}`);
+  }
+  return cookie;
 }

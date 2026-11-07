@@ -1,9 +1,18 @@
-import type { Booking, Business, CreateBookingRequest } from '@erc/contracts';
+import {
+  MAX_BOOKING_LIST_DAYS,
+  type Booking,
+  type BookingListQuery,
+  type Business,
+  type CreateBookingRequest,
+  type UpdateBookingRequest,
+} from '@erc/contracts';
 import type { FastifyBaseLogger } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 import pg from 'pg';
+import type { Actor } from '../../auth/sessions.ts';
 import type { Database } from '../../db/database.ts';
 import type { DB } from '../../db/types.ts';
+import { isStaff } from '../../http/auth.ts';
 import { ProblemError } from '../../http/problems.ts';
 import type { Clock } from '../../shared/clock.ts';
 import type { Mailer } from '../../shared/mailer.ts';
@@ -16,17 +25,22 @@ import { findActiveService, getBusiness, listStaffForService } from '../catalog/
 import {
   candidateStaff,
   findBooking,
+  findConflicts,
   findIdempotencyRecord,
   findOrCreateCustomer,
   hasValidAccessToken,
   insertAccessToken,
   insertBooking,
+  isOwnedBy,
+  listBookings,
   lockBooking,
   lockIdempotencyKey,
   lockStaffForBooking,
   markCancelled,
+  moveBooking,
   parseStoredBooking,
   saveIdempotencyRecord,
+  setStatus,
   type NewBooking,
 } from './repository.ts';
 
@@ -67,6 +81,7 @@ export async function createBooking(
   deps: BookingDeps,
   input: CreateBookingRequest,
   idempotencyKey: string,
+  actor: Actor | null,
 ): Promise<CreateBookingResult> {
   const requestHash = hashJson(input);
 
@@ -106,7 +121,8 @@ export async function createBooking(
     }
 
     const startsAt = toInstant(input.startsAt);
-    assertWithinPolicy(business, startsAt, toInstant(deps.clock.now()));
+    // Personal får boka utanför policyn, till exempel samma dag eller utanför rutnätet.
+    if (!isStaff(actor)) assertWithinPolicy(business, startsAt, toInstant(deps.clock.now()));
     const endsAt = startsAt.add({ minutes: service.durationMinutes });
     const blocked = {
       start: startsAt.subtract({ minutes: service.bufferBeforeMinutes }),
@@ -251,68 +267,182 @@ async function sendConfirmation(
   }
 }
 
+type BookingAccess =
+  | { readonly mode: 'staff'; readonly actor: Actor }
+  | { readonly mode: 'owner'; readonly actor: Actor }
+  | { readonly mode: 'token' };
+
 /**
- * Hanteringslänken ger tillgång till exakt en bokning. Ogiltig, utgången eller
- * fel bokning ger 404, så att det inte går att avgöra vilka id:n som finns.
+ * Vem får se och avboka en bokning (ADR-0008): personal alltid, en inloggad
+ * kund sina egna, och den som har hanteringslänken just den bokningen.
+ * Allt annat ger 404, så att det inte går att avgöra vilka id:n som finns.
  */
-async function authorizeWithToken(
+async function authorizeBookingAccess(
   deps: Pick<BookingDeps, 'db' | 'clock'>,
   bookingId: string,
+  actor: Actor | null,
   token: string | undefined,
-): Promise<void> {
-  if (token === undefined) throw new ProblemError('unauthenticated', 401);
-  const valid =
-    isWellFormedToken(token) &&
-    (await hasValidAccessToken(deps.db, {
-      bookingId,
-      tokenHash: hashToken(token),
-      now: toIso(toInstant(deps.clock.now())),
-    }));
-  if (!valid) throw new ProblemError('not-found', 404);
+): Promise<BookingAccess> {
+  if (isStaff(actor)) return { mode: 'staff', actor };
+
+  if (actor !== null && actor.customerId !== null) {
+    const owned = await isOwnedBy(deps.db, bookingId, actor.customerId);
+    if (owned) return { mode: 'owner', actor };
+  }
+
+  if (token !== undefined) {
+    const valid =
+      isWellFormedToken(token) &&
+      (await hasValidAccessToken(deps.db, {
+        bookingId,
+        tokenHash: hashToken(token),
+        now: toIso(toInstant(deps.clock.now())),
+      }));
+    if (valid) return { mode: 'token' };
+  }
+
+  if (actor === null && token === undefined) throw new ProblemError('unauthenticated', 401);
+  throw new ProblemError('not-found', 404);
 }
 
-export async function getBookingWithToken(
-  deps: Pick<BookingDeps, 'db' | 'clock'>,
-  bookingId: string,
-  token: string | undefined,
-): Promise<Booking> {
-  await authorizeWithToken(deps, bookingId, token);
-  const booking = await findBooking(deps.db, bookingId);
+async function loadBooking(db: Database, bookingId: string): Promise<Booking> {
+  const booking = await findBooking(db, bookingId);
   if (booking === undefined) throw new ProblemError('not-found', 404);
   return booking;
 }
 
-/**
- * Avbokar via hanteringslänken. Idempotent: en redan avbokad bokning returneras
- * oförändrad. Avbokning frigör tiden direkt, eftersom booking_no_overlap bara
- * gäller bokningar som inte är avbokade.
- */
-export async function cancelBookingWithToken(
+export async function getBooking(
   deps: Pick<BookingDeps, 'db' | 'clock'>,
   bookingId: string,
+  actor: Actor | null,
   token: string | undefined,
 ): Promise<Booking> {
-  await authorizeWithToken(deps, bookingId, token);
+  await authorizeBookingAccess(deps, bookingId, actor, token);
+  return loadBooking(deps.db, bookingId);
+}
+
+/**
+ * Avbokar. Idempotent: en redan avbokad bokning returneras oförändrad.
+ * Kunder och hanteringslänkar måste hålla gränsen för avbokning, personal inte.
+ * Avbokning frigör tiden direkt, eftersom booking_no_overlap bara gäller bokningar
+ * som inte är avbokade.
+ */
+export async function cancelBooking(
+  deps: Pick<BookingDeps, 'db' | 'clock'>,
+  bookingId: string,
+  actor: Actor | null,
+  token: string | undefined,
+): Promise<Booking> {
+  const access = await authorizeBookingAccess(deps, bookingId, actor, token);
   const now = toInstant(deps.clock.now());
 
   await deps.db.transaction().execute(async (trx) => {
     const current = await lockBooking(trx, bookingId);
     if (current === undefined) throw new ProblemError('not-found', 404);
     if (current.status === 'cancelled') return;
-
-    const business = await getBusiness(trx);
-    const deadline = toInstant(current.startsAt).subtract({
-      minutes: business.cancelCutoffMinutes,
-    });
-    if (current.status !== 'confirmed' || Temporal.Instant.compare(now, deadline) > 0) {
-      throw new ProblemError('cancellation-window-closed', 409, {
-        detail: `Avbokning måste ske senast ${business.cancelCutoffMinutes} minuter före besöket.`,
+    if (current.status !== 'confirmed') {
+      throw new ProblemError('booking-not-active', 409, {
+        detail: `En bokning med status ${current.status} kan inte avbokas.`,
       });
     }
-    await markCancelled(trx, bookingId, toIso(now));
+
+    if (access.mode !== 'staff') {
+      const business = await getBusiness(trx);
+      const deadline = toInstant(current.startsAt).subtract({
+        minutes: business.cancelCutoffMinutes,
+      });
+      if (Temporal.Instant.compare(now, deadline) > 0) {
+        throw new ProblemError('cancellation-window-closed', 409, {
+          detail: `Avbokning måste ske senast ${business.cancelCutoffMinutes} minuter före besöket.`,
+        });
+      }
+    }
+    await markCancelled(trx, bookingId, {
+      at: toIso(now),
+      by: access.mode === 'token' ? null : access.actor.userId,
+    });
   });
 
-  const booking = await findBooking(deps.db, bookingId);
-  if (booking === undefined) throw new ProblemError('not-found', 404);
-  return booking;
+  return loadBooking(deps.db, bookingId);
+}
+
+/**
+ * Personalens ändringar: ny status eller flytt till annan tid eller person.
+ * Policy gäller inte personal, men invarianterna i databasen gäller alltid
+ * (ADR-0002): en flytt till en upptagen tid ger 409 slot-unavailable.
+ */
+export async function updateBooking(
+  deps: Pick<BookingDeps, 'db' | 'clock'>,
+  bookingId: string,
+  actor: Actor,
+  input: UpdateBookingRequest,
+): Promise<Booking> {
+  const moving = input.startsAt !== undefined || input.staffId !== undefined;
+  if (moving && input.status !== undefined) {
+    throw new ProblemError('validation-failed', 400, {
+      errors: [{ path: 'body', message: 'change status and move a booking in separate requests' }],
+    });
+  }
+  const now = toIso(toInstant(deps.clock.now()));
+
+  await deps.db.transaction().execute(async (trx) => {
+    const current = await lockBooking(trx, bookingId);
+    if (current === undefined) throw new ProblemError('not-found', 404);
+    if (current.status !== 'confirmed') {
+      throw new ProblemError('booking-not-active', 409, {
+        detail: `En bokning med status ${current.status} kan inte ändras.`,
+      });
+    }
+
+    if (input.status === 'cancelled') {
+      await markCancelled(trx, bookingId, { at: now, by: actor.userId });
+    } else if (input.status !== undefined) {
+      await setStatus(trx, bookingId, input.status);
+    } else {
+      const startsAt = toInstant(input.startsAt ?? current.startsAt);
+      const duration = toInstant(current.startsAt).until(toInstant(current.endsAt));
+      const staffId = input.staffId ?? current.staffId;
+      await lockStaffForBooking(trx, [current.staffId, staffId]);
+      await moveBooking(trx, bookingId, {
+        staffId,
+        startsAt: toIso(startsAt),
+        endsAt: toIso(startsAt.add(duration)),
+      });
+    }
+  });
+
+  return loadBooking(deps.db, bookingId);
+}
+
+export function listBookingsForStaff(
+  deps: Pick<BookingDeps, 'db'>,
+  query: BookingListQuery,
+): Promise<Booking[]> {
+  const from = toInstant(query.from);
+  const to = toInstant(query.to);
+  if (Temporal.Instant.compare(to, from) <= 0) {
+    throw new ProblemError('validation-failed', 400, {
+      errors: [{ path: 'querystring/to', message: 'must be after from' }],
+    });
+  }
+  if (from.until(to).total('hours') > MAX_BOOKING_LIST_DAYS * 24) {
+    throw new ProblemError('validation-failed', 400, {
+      errors: [
+        {
+          path: 'querystring/to',
+          message: `must be at most ${MAX_BOOKING_LIST_DAYS} days after from`,
+        },
+      ],
+    });
+  }
+  return listBookings(deps.db, {
+    from: toIso(from),
+    to: toIso(to),
+    ...(query.staffId === undefined ? {} : { staffId: query.staffId }),
+    ...(query.status === undefined ? {} : { status: query.status }),
+  });
+}
+
+export function listConflicts(deps: Pick<BookingDeps, 'db' | 'clock'>): Promise<Booking[]> {
+  return findConflicts(deps.db, { from: toIso(toInstant(deps.clock.now())) });
 }

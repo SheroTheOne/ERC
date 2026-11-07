@@ -13,6 +13,8 @@ export const ProblemType = Type.Union([
   Type.Literal('staff-inactive'),
   Type.Literal('cancellation-window-closed'),
   Type.Literal('schedule-overlap'),
+  Type.Literal('already-exists'),
+  Type.Literal('booking-not-active'),
   Type.Literal('staff-does-not-perform-service'),
   Type.Literal('idempotency-key-reused'),
   Type.Literal('idempotency-key-required'),

@@ -17,6 +17,8 @@ const TITLES = {
   'staff-inactive': 'Personen tar inte emot bokningar',
   'cancellation-window-closed': 'Det är för sent att avboka',
   'schedule-overlap': 'Arbetspasset överlappar ett annat pass',
+  'already-exists': 'Det finns redan',
+  'booking-not-active': 'Bokningen är inte längre aktiv',
   'staff-does-not-perform-service': 'Personen utför inte tjänsten',
   'idempotency-key-reused': 'Idempotensnyckeln används redan för en annan förfrågan',
   'idempotency-key-required': 'Headern Idempotency-Key saknas',
@@ -59,10 +61,13 @@ const CONSTRAINT_PROBLEMS: Readonly<Record<string, readonly [ProblemType, number
   booking_staff_active: ['staff-inactive', 409],
   working_hours_no_overlap: ['schedule-overlap', 409],
   booking_staff_performs_service: ['staff-does-not-perform-service', 422],
+  business_timezone_check: ['validation-failed', 400],
+  app_user_email_key: ['already-exists', 409],
 };
 
 const SQLSTATE = {
   exclusionViolation: '23P01',
+  uniqueViolation: '23505',
   checkViolation: '23514',
   connectionFailure: '08006',
   cannotConnectNow: '57P03',
@@ -73,7 +78,9 @@ const SQLSTATE = {
 export function problemFromDatabaseError(error: pg.DatabaseError): ProblemError | undefined {
   const { code, constraint } = error;
   if (
-    (code === SQLSTATE.exclusionViolation || code === SQLSTATE.checkViolation) &&
+    (code === SQLSTATE.exclusionViolation ||
+      code === SQLSTATE.checkViolation ||
+      code === SQLSTATE.uniqueViolation) &&
     constraint !== undefined
   ) {
     const mapped = CONSTRAINT_PROBLEMS[constraint];

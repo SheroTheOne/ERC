@@ -1,6 +1,7 @@
 // Påhittad demodata (ADR-0010). Idempotent: fasta id:n och ON CONFLICT DO NOTHING,
 // så att skriptet kan köras flera gånger och e2e-tester kan referera till id:na.
 import process from 'node:process';
+import { hashPassword } from '../../src/auth/password.ts';
 import { loadConfig } from '../../src/config.ts';
 import { createDatabase, createPool, type Database } from '../../src/db/database.ts';
 
@@ -28,6 +29,9 @@ export const SEED = {
 
 const VALID_FROM = '2026-01-01';
 
+/** Lösenord för demokontona. Bara för påhittad demodata, seeden vägrar köra i produktion. */
+export const DEMO_PASSWORD = 'erc-demo-2026';
+
 type Shift = readonly [weekday: number, start: string, end: string];
 
 const SCHEDULES: Readonly<Record<keyof typeof SEED.staff, readonly Shift[]>> = {
@@ -44,6 +48,7 @@ const SCHEDULES: Readonly<Record<keyof typeof SEED.staff, readonly Shift[]>> = {
 };
 
 export async function seed(db: Database): Promise<void> {
+  const passwordHash = await hashPassword(DEMO_PASSWORD);
   await db.transaction().execute(async (trx) => {
     await trx
       .insertInto('business')
@@ -51,13 +56,12 @@ export async function seed(db: Database): Promise<void> {
       .onConflict((oc) => oc.column('id').doNothing())
       .execute();
 
-    // Lösenord sätts när inloggningen byggs i Fas 3.
     await trx
       .insertInto('appUser')
       .values([
-        { id: SEED.users.alva, email: 'alva@erc.example', role: 'admin' },
-        { id: SEED.users.anna, email: 'anna@erc.example', role: 'staff' },
-        { id: SEED.users.bo, email: 'bo@erc.example', role: 'staff' },
+        { id: SEED.users.alva, email: 'alva@erc.example', role: 'admin', passwordHash },
+        { id: SEED.users.anna, email: 'anna@erc.example', role: 'staff', passwordHash },
+        { id: SEED.users.bo, email: 'bo@erc.example', role: 'staff', passwordHash },
       ])
       .onConflict((oc) => oc.column('id').doNothing())
       .execute();

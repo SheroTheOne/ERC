@@ -14,10 +14,14 @@ import Fastify, {
 import type { Config } from './config.ts';
 import type { Database } from './db/database.ts';
 import { ProblemError, sendProblem, toProblem } from './http/problems.ts';
+import { registerAuth } from './http/auth.ts';
+import { authRoutes } from './modules/auth/routes.ts';
 import { availabilityRoutes } from './modules/availability/routes.ts';
 import { bookingRoutes } from './modules/bookings/routes.ts';
 import { catalogRoutes } from './modules/catalog/routes.ts';
+import { customerRoutes } from './modules/customers/routes.ts';
 import { healthRoutes } from './modules/health/routes.ts';
+import { staffRoutes } from './modules/staff/routes.ts';
 import type { Clock } from './shared/clock.ts';
 import type { Mailer } from './shared/mailer.ts';
 
@@ -84,12 +88,17 @@ export async function buildApp(deps: AppDeps, options: BuildAppOptions = {}): Pr
     return sendProblem(reply, request, problem);
   });
 
+  await registerAuth(app);
+
   await app.register(
     (api, _options, done) => {
       healthRoutes(api);
       catalogRoutes(api);
       availabilityRoutes(api);
       bookingRoutes(api);
+      authRoutes(api);
+      staffRoutes(api);
+      customerRoutes(api);
       done();
     },
     { prefix: API_PREFIX },
