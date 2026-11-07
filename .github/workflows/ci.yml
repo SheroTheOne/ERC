@@ -1,9 +1,10 @@
 name: CI
 
+# Push till alla grenar. Statusen hamnar på commiten och syns därför också på
+# pull requests, utan att samma commit körs två gånger.
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: ['**']
 
 permissions:
   contents: read

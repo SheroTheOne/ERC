@@ -14,13 +14,18 @@ import Fastify, {
 import type { Config } from './config.ts';
 import type { Database } from './db/database.ts';
 import { ProblemError, sendProblem, toProblem } from './http/problems.ts';
+import { availabilityRoutes } from './modules/availability/routes.ts';
+import { bookingRoutes } from './modules/bookings/routes.ts';
+import { catalogRoutes } from './modules/catalog/routes.ts';
 import { healthRoutes } from './modules/health/routes.ts';
 import type { Clock } from './shared/clock.ts';
+import type { Mailer } from './shared/mailer.ts';
 
 export interface AppDeps {
   readonly config: Config;
   readonly db: Database;
   readonly clock: Clock;
+  readonly mailer: Mailer;
 }
 
 export type AppInstance = FastifyInstance<
@@ -82,6 +87,9 @@ export async function buildApp(deps: AppDeps, options: BuildAppOptions = {}): Pr
   await app.register(
     (api, _options, done) => {
       healthRoutes(api);
+      catalogRoutes(api);
+      availabilityRoutes(api);
+      bookingRoutes(api);
       done();
     },
     { prefix: API_PREFIX },

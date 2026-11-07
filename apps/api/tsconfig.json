@@ -1,7 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    "lib": ["es2024", "esnext.temporal"]
   },
   "include": ["src", "test", "db", "vitest.config.ts"]
 }

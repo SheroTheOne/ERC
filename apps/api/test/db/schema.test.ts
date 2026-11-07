@@ -100,7 +100,7 @@ describe('working hours across daylight saving time (Europe/Stockholm)', () => {
               lower(staff_working_periods($1, tstzrange('2026-03-30 00:00Z', '2026-03-31 00:00Z'))) AS summer`,
       [STAFF],
     );
-    expect(row).toEqual({ winter: '2026-03-23T08:00:00.000Z', summer: '2026-03-30T07:00:00.000Z' });
+    expect(row).toEqual({ winter: '2026-03-23T08:00:00Z', summer: '2026-03-30T07:00:00Z' });
   });
 
   it('does not depend on the session time zone and supports 24:00 as end of day', async () => {
@@ -296,6 +296,6 @@ describe('working hours and settings', () => {
     const row = await single<{ d: string; t: string }>(
       `SELECT DATE '2026-03-29' AS d, TIMESTAMPTZ '2026-03-29 02:30:00+01' AS t`,
     );
-    expect(row).toEqual({ d: '2026-03-29', t: '2026-03-29T01:30:00.000Z' });
+    expect(row).toEqual({ d: '2026-03-29', t: '2026-03-29T01:30:00Z' });
   });
 });

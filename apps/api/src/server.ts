@@ -3,6 +3,7 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDatabase, createPool } from './db/database.ts';
 import { systemClock } from './shared/clock.ts';
+import { createLogMailer } from './shared/mailer.ts';
 
 const config = loadConfig(process.env);
 // Loggern skapas av Fastify i buildApp. Fel som uppstår innan dess skrivs till stderr.
@@ -18,8 +19,14 @@ const pool = createPool({
 });
 const db = createDatabase(pool);
 
+// Riktig e-post kommer i Fas 5. Tills dess loggas utskicket, med token bara i utveckling.
 const app = await buildApp(
-  { config, db, clock: systemClock },
+  {
+    config,
+    db,
+    clock: systemClock,
+    mailer: createLogMailer(() => app.log, { revealTokens: config.env === 'development' }),
+  },
   {
     logger: {
       level: config.logLevel,

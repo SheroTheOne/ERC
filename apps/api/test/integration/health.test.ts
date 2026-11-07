@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp, type AppInstance } from '../../src/app.ts';
 import { loadConfig } from '../../src/config.ts';
 import { fixedClock } from '../../src/shared/clock.ts';
+import { InMemoryMailer } from '../../src/shared/mailer.ts';
 import { createTestDatabase, type TestDatabase } from '../setup/database.ts';
 
 let testDb: TestDatabase;
@@ -14,7 +15,12 @@ beforeAll(async () => {
     PUBLIC_ORIGIN: 'http://localhost',
     NODE_ENV: 'test',
   });
-  app = await buildApp({ config, db: testDb.db, clock: fixedClock('2026-03-29T01:30:00Z') });
+  app = await buildApp({
+    config,
+    db: testDb.db,
+    mailer: new InMemoryMailer(),
+    clock: fixedClock('2026-03-29T01:30:00Z'),
+  });
 });
 
 afterAll(async () => {

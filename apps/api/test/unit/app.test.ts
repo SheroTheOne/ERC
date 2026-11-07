@@ -4,6 +4,7 @@ import { buildApp, type AppInstance } from '../../src/app.ts';
 import { loadConfig } from '../../src/config.ts';
 import { createDatabase, createPool } from '../../src/db/database.ts';
 import { fixedClock } from '../../src/shared/clock.ts';
+import { InMemoryMailer } from '../../src/shared/mailer.ts';
 
 // En databas som inte går att nå: HTTP-lagret ska fungera och svara 503, utan riktig PostgreSQL.
 const UNREACHABLE_DATABASE = 'postgres://erc:erc@127.0.0.1:1/erc';
@@ -19,7 +20,12 @@ async function createApp(): Promise<AppInstance> {
   const db = createDatabase(
     createPool({ connectionString: config.databaseUrl, max: 1, onIdleError: () => undefined }),
   );
-  app = await buildApp({ config, db, clock: fixedClock('2026-01-01T00:00:00Z') });
+  app = await buildApp({
+    config,
+    db,
+    mailer: new InMemoryMailer(),
+    clock: fixedClock('2026-01-01T00:00:00Z'),
+  });
   app.addHook('onClose', () => db.destroy());
   return app;
 }
