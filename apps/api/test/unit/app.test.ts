@@ -16,7 +16,9 @@ async function createApp(): Promise<AppInstance> {
     PUBLIC_ORIGIN: 'http://localhost',
     NODE_ENV: 'test',
   });
-  const db = createDatabase(createPool({ connectionString: config.databaseUrl, max: 1 }));
+  const db = createDatabase(
+    createPool({ connectionString: config.databaseUrl, max: 1, onIdleError: () => undefined }),
+  );
   app = await buildApp({ config, db, clock: fixedClock('2026-01-01T00:00:00Z') });
   app.addHook('onClose', () => db.destroy());
   return app;

@@ -28,10 +28,16 @@ export interface DatabaseOptions {
   readonly connectionString: string;
   readonly max?: number;
   readonly applicationName?: string;
+  /**
+   * Fel från vilande anslutningar, till exempel när databasen startas om eller
+   * en anslutning avslutas av servern. Utan lyssnare kraschar Node processen,
+   * så varje anropare måste ta ställning till hur felet ska hanteras.
+   */
+  readonly onIdleError: (error: Error) => void;
 }
 
 export function createPool(options: DatabaseOptions): pg.Pool {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString: options.connectionString,
     max: options.max ?? 10,
     application_name: options.applicationName ?? 'erc-api',
@@ -42,6 +48,8 @@ export function createPool(options: DatabaseOptions): pg.Pool {
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 30_000,
   });
+  pool.on('error', options.onIdleError);
+  return pool;
 }
 
 export function createDatabase(pool: pg.Pool): Database {

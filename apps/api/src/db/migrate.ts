@@ -8,6 +8,9 @@ const pool = createPool({
   connectionString: config.databaseUrl,
   max: 1,
   applicationName: 'erc-migrate',
+  onIdleError: (error) => {
+    console.error('idle database client error', error);
+  },
 });
 const db = createDatabase(pool);
 

@@ -47,7 +47,13 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
   // Alla anslutningar till mallen måste vara stängda innan den kan klonas.
   const templateDb = createDatabase(
-    createPool({ connectionString: databaseUrl(adminUrl, templateName), max: 1 }),
+    createPool({
+      connectionString: databaseUrl(adminUrl, templateName),
+      max: 1,
+      onIdleError: (error) => {
+        throw error;
+      },
+    }),
   );
   try {
     await migrateToLatest(templateDb);

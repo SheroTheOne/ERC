@@ -33,6 +33,7 @@ export async function createTestDatabase(
     connectionString: url,
     max: options.poolMax ?? 5,
     applicationName: 'erc-test',
+    onIdleError: ignoreTerminationOnDrop,
   });
   const db = createDatabase(pool);
 
@@ -47,6 +48,18 @@ export async function createTestDatabase(
       );
     },
   };
+}
+
+const ADMIN_SHUTDOWN = '57P01';
+
+/**
+ * destroy() tar bort databasen med WITH (FORCE). En anslutning som poolen
+ * fortfarande håller på att stänga avslutas då av servern, och det felet är
+ * väntat. Alla andra fel ska synas.
+ */
+function ignoreTerminationOnDrop(error: Error): void {
+  if (error instanceof pg.DatabaseError && error.code === ADMIN_SHUTDOWN) return;
+  throw error;
 }
 
 async function withAdmin<T>(adminUrl: string, fn: (client: pg.Client) => Promise<T>): Promise<T> {

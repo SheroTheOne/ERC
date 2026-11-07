@@ -5,7 +5,17 @@ import { createDatabase, createPool } from './db/database.ts';
 import { systemClock } from './shared/clock.ts';
 
 const config = loadConfig(process.env);
-const pool = createPool({ connectionString: config.databaseUrl, max: config.databasePoolMax });
+// Loggern skapas av Fastify i buildApp. Fel som uppstår innan dess skrivs till stderr.
+let logIdleError = (error: Error): void => {
+  console.error('idle database client error', error);
+};
+const pool = createPool({
+  connectionString: config.databaseUrl,
+  max: config.databasePoolMax,
+  onIdleError: (error) => {
+    logIdleError(error);
+  },
+});
 const db = createDatabase(pool);
 
 const app = await buildApp(
@@ -21,6 +31,10 @@ const app = await buildApp(
     },
   },
 );
+
+logIdleError = (error) => {
+  app.log.error({ err: error }, 'idle database client error');
+};
 
 let shuttingDown = false;
 async function shutdown(signal: NodeJS.Signals): Promise<void> {

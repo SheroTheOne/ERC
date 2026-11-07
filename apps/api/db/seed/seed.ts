@@ -160,7 +160,14 @@ if (import.meta.main) {
     process.exit(1);
   }
   const db = createDatabase(
-    createPool({ connectionString: config.databaseUrl, max: 1, applicationName: 'erc-seed' }),
+    createPool({
+      connectionString: config.databaseUrl,
+      max: 1,
+      applicationName: 'erc-seed',
+      onIdleError: (error) => {
+        console.error('idle database client error', error);
+      },
+    }),
   );
   try {
     await seed(db);
