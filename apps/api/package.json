@@ -1,0 +1,32 @@
+{
+  "name": "@erc/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/server.ts",
+    "start": "node src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "db:migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
+    "db:seed": "node --env-file-if-exists=.env db/seed/seed.ts",
+    "db:codegen": "kysely-codegen --dialect postgres --camel-case --default-schema erc --include-pattern 'erc.*' --date-parser string --type-mapping '{\"timestamptz\":\"string\",\"tstzrange\":\"string\",\"citext\":\"string\"}' --out-file src/db/types.ts"
+  },
+  "dependencies": {
+    "@erc/contracts": "0.0.0",
+    "@fastify/static": "10.1.10",
+    "@fastify/type-provider-typebox": "6.3.0",
+    "fastify": "5.12.8",
+    "kysely": "0.29.8",
+    "pg": "8.23.1",
+    "typebox": "1.4.5"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "12.2.1",
+    "@types/pg": "8.23.1",
+    "kysely-codegen": "0.20.0",
+    "pino-pretty": "13.2.0",
+    "vitest": "5.1.0"
+  }
+}

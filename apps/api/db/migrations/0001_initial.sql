@@ -1,16 +1,14 @@
--- ERC schemautkast (Fas 0).
+-- 0001: grundschema för ERC.
 --
--- Det här är designunderlaget för den första migreringen. I Fas 1 flyttas det
--- till apps/api/db/migrations/0001_initial.sql och den här filen tas bort.
 -- Motiveringar finns i docs/decisions/, se ADR-referenserna i kommentarerna.
---
 -- Mål: PostgreSQL 18 (uuidv7(), multiranges, btree_gist).
+-- Körs i en transaktion av migreringsverktyget (ADR-0006), därför SET LOCAL.
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE EXTENSION IF NOT EXISTS citext;
 
 CREATE SCHEMA erc;
-SET search_path = erc, public;
+SET LOCAL search_path = erc, public;
 
 -- Range-typ för väggklocktider, används för att hindra överlappande arbetspass.
 CREATE TYPE timerange AS RANGE (subtype = time);
@@ -174,7 +172,9 @@ CREATE TABLE booking (
   customer_note         text CHECK (char_length(customer_note) <= 500),
   -- Tiden personalen är upptagen, inklusive buffert. Sätts alltid av
   -- triggern booking_10_set_blocked och kan inte skrivas av klienten.
-  blocked               tstzrange NOT NULL,
+  -- Defaultvärdet finns bara för att genererade typer ska markera kolumnen
+  -- som valfri vid INSERT; triggern skriver alltid över det.
+  blocked               tstzrange NOT NULL DEFAULT 'empty',
   status                text NOT NULL DEFAULT 'confirmed'
                         CHECK (status IN ('confirmed', 'cancelled', 'completed', 'no_show')),
   cancelled_at          timestamptz,

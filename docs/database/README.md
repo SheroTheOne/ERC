@@ -1,6 +1,6 @@
 # Datamodell
 
-Det körbara utkastet finns i [`schema.sql`](schema.sql). Motiveringarna finns i ADR-0002 till ADR-0005.
+Schemat finns i migreringen [`0001_initial.sql`](../../apps/api/db/migrations/0001_initial.sql). Motiveringarna finns i ADR-0002 till ADR-0005. Kysely-typerna i `apps/api/src/db/types.ts` genereras från den migrerade databasen, och CI kontrollerar att de är aktuella.
 
 ```mermaid
 erDiagram
@@ -101,9 +101,9 @@ erDiagram
 | Inga överlappande arbetspass | `working_hours_no_overlap` | `23P01` → 409 `schedule-overlap` |
 | Avbokning har tidsstämpel | `booking_cancellation_consistent` | `23514` → 500 (programmeringsfel) |
 
-## Validering av utkastet
+## Tester av schemat
 
-Utkastet har körts mot PGlite (PostgreSQL 17.5 i WASM) med en shim för `uuidv7()`. Alla 26 kontroller gick igenom. De blir integrationstester i Fas 2:
+I Fas 0 validerades utkastet mot PGlite (PostgreSQL i WASM). Kontrollerna finns nu som integrationstester i [`apps/api/test/db/schema.test.ts`](../../apps/api/test/db/schema.test.ts) och körs mot PostgreSQL 18 i CI:
 
 - **Sommartid:** passet 01–05 lokal tid ger 3 verkliga timmar 2026-03-29 och 5 timmar 2026-10-25. 09:00 lokal tid blir 08:00Z före och 07:00Z efter omställningen. Resultatet är oberoende av sessionens `TimeZone`, och `end_time = '24:00'` fungerar.
 - **Bokningar:** överlappning ger `23P01`. Start inom föregående buffert nekas, start exakt när bufferten slutar godkänns. Bokningar utanför arbetstid, över lunch, med buffert efter stängning eller med en tjänst personalen inte utför nekas. `blocked` går inte att skriva över.
@@ -111,4 +111,4 @@ Utkastet har körts mot PGlite (PostgreSQL 17.5 i WASM) med en shim för `uuidv7
 - **Frånvaro:** nya bokningar under frånvaro nekas, medan befintliga bokningar och statusbyten påverkas inte.
 - **Arbetstider:** överlappande pass nekas. Datumstyrd ändring av ett pass fungerar.
 
-Valideringen hittade en bugg i utkastet: BEFORE-triggers körs i bokstavsordning, så kontrollen kördes före omräkningen av `blocked`. Det är rättat genom att triggerna numreras.
+Valideringen i Fas 0 hittade en bugg i utkastet: BEFORE-triggers körs i bokstavsordning, så kontrollen kördes före omräkningen av `blocked`. Det är rättat genom att triggerna numreras.

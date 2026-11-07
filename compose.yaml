@@ -1,0 +1,35 @@
+name: erc
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: erc
+      POSTGRES_PASSWORD: erc
+      POSTGRES_DB: erc
+    ports:
+      - '${ERC_DB_PORT:-5432}:5432'
+    # PostgreSQL 18-avbildningen lagrar data under /var/lib/postgresql/18/docker,
+    # så volymen monteras på föräldrakatalogen.
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U erc -d erc']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://erc:erc@db:5432/erc
+      PUBLIC_ORIGIN: http://localhost:${ERC_APP_PORT:-3000}
+      LOG_LEVEL: info
+    ports:
+      - '${ERC_APP_PORT:-3000}:3000'
+
+volumes:
+  db-data:

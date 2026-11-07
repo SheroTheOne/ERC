@@ -1,0 +1,6 @@
+package-lock.json
+dist/
+coverage/
+apps/api/src/db/types.ts
+*.sql
+*.md

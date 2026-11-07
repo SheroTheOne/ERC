@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Format, lint, typer, enhetstester och bygge
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  integration:
+    name: Integrationstester mot PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # github-actions-reportern gör varje testfel till en annotering i PR:en.
+      - name: Integrationstester
+        run: |
+          set -o pipefail
+          npm run test:integration -- --reporter=default --reporter=github-actions 2>&1 | tee integration.log
+      # Fel i global setup syns inte som testfel. Slutet av utskriften blir en
+      # annotering, så att felet går att läsa utan att öppna loggarna.
+      - name: Visa slutet av testutskriften
+        if: failure()
+        run: |
+          message=$(tail -n 80 integration.log | sed 's/\x1b\[[0-9;]*m//g; s/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Integrationstester::${message}"
+      - name: Genererade databastyper stämmer med migreringarna
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/erc_codegen
+          PUBLIC_ORIGIN: http://localhost
+        run: |
+          psql "$TEST_DATABASE_URL" -c 'CREATE DATABASE erc_codegen'
+          npm run db:migrate
+          npm run db:codegen
+          if ! git diff --exit-code -- apps/api/src/db/types.ts > types.diff; then
+            message=$(sed 's/%/%25/g' types.diff | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error file=apps/api/src/db/types.ts,title=Genererade typer är inaktuella (kör npm run db:codegen)::${message}"
+            exit 1
+          fi
+
+  docker:
+    name: Docker Compose startar och svarar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose up --build --detach --wait --wait-timeout 180
+      - name: API och webb svarar
+        run: |
+          curl --fail --silent --show-error http://localhost:3000/api/v1/health
+          curl --fail --silent --show-error http://localhost:3000/ | grep -q '<div id="root">'
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down --volumes
