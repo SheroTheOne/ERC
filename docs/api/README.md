@@ -140,5 +140,8 @@ Alla fel har `type`, `title`, `status`, `detail`, `instance` och `requestId`. `t
 | `staff-does-not-perform-service` | 422 | `booking_staff_performs_service` |
 | `idempotency-key-reused` | 422 | Samma nyckel med annat innehåll |
 | `idempotency-key-required` | 428 | Headern saknas på `POST /bookings` |
+| `payload-too-large` | 413 | Förfrågan överskrider storleksgränsen |
+| `unsupported-media-type` | 415 | Annan `Content-Type` än `application/json` |
 | `rate-limited` | 429 | Innehåller `Retry-After` |
 | `internal` | 500 | Aldrig intern information i `detail` |
+| `service-unavailable` | 503 | Databasen går inte att nå |

@@ -4,7 +4,7 @@ Ett boknings- och kundhanteringssystem för små tjänsteföretag, till exempel 
 
 Projektet är ett portfolioprojekt med fokus på det som är svårt i riktiga system: datamodellering, samtidighet, behörigheter, tester och driftsättning.
 
-> **Status:** Fas 0 (design) är i stort sett klar: arkitekturbeslut, datamodell, API-utkast och vyskisser finns i [`docs/`](docs/). Ingen applikationskod är skriven än.
+> **Status:** Fas 1 (projektgrund) är klar: monorepo, migreringar, testdata, tester och CI. Bokningskärnan byggs i Fas 2. Designbeslut finns i [`docs/`](docs/).
 
 ## Mål
 
@@ -52,7 +52,7 @@ Bekräftat i Fas 0. Motiveringarna finns i ADR:erna.
 
 | Del | Val | Motivering |
 | --- | --- | --- |
-| Språk | TypeScript | Samma språk och delade typer i frontend och backend |
+| Språk | TypeScript 6, körs direkt av Node utan byggsteg | Samma språk och delade typer i frontend och backend ([ADR-0011](docs/decisions/0011-typescript-utan-byggsteg.md)) |
 | Backend | Node.js 26 med Fastify, TypeBox och Kysely | Inbyggd schemavalidering, OpenAPI från koden och typade frågor ([ADR-0006](docs/decisions/0006-dataatkomst-och-migreringar.md), [ADR-0007](docs/decisions/0007-api-kontrakt-och-fel.md)) |
 | Databas | PostgreSQL 18 | Constraints på tidsintervall, multiranges och `uuidv7()` ([ADR-0002](docs/decisions/0002-postgresql-som-kalla-till-sanning.md)) |
 | Frontend | React med Vite | Stort ekosystem och enkel uppsättning |
@@ -61,7 +61,7 @@ Bekräftat i Fas 0. Motiveringarna finns i ADR:erna.
 
 ## Datamodell
 
-Den fullständiga modellen, med ER-diagram och en tabell över vilka regler som garanteras av databasen, finns i [`docs/database/`](docs/database/). Schemautkastet [`schema.sql`](docs/database/schema.sql) har validerats mot PostgreSQL med kontroller för sommartid, buffert, avbokning och frånvaro.
+Den fullständiga modellen, med ER-diagram och en tabell över vilka regler som garanteras av databasen, finns i [`docs/database/`](docs/database/). Schemat ligger i [`0001_initial.sql`](apps/api/db/migrations/0001_initial.sql) och testas direkt i SQL för sommartid, buffert, avbokning och frånvaro.
 
 Kärnan är att dubbelbokningar stoppas av databasen, även om två förfrågningar kommer in samtidigt. Constraintet gäller den tid personalen är upptagen *inklusive* buffert, och den tiden räknas ut av en trigger:
 
@@ -73,6 +73,32 @@ CONSTRAINT booking_no_overlap EXCLUDE USING gist (
 ```
 
 En översikt över arkitektur och mappstruktur finns i [`docs/architecture.md`](docs/architecture.md).
+
+## Kom igång
+
+Kräver Node.js 26 och Docker (eller Podman).
+
+```sh
+docker compose up --build        # PostgreSQL 18 + app på http://localhost:3000
+```
+
+Utveckling med omladdning:
+
+```sh
+npm ci
+cp apps/api/.env.example apps/api/.env
+npm run db:up                    # bara databasen
+npm run db:migrate
+npm run db:seed                  # påhittad demodata
+npm run dev                      # API på :3000, webb på http://localhost:5173
+```
+
+| Kommando | Gör |
+| --- | --- |
+| `npm run lint` / `typecheck` / `format:check` | Statisk kontroll |
+| `npm test` | Enhetstester, ingen databas behövs |
+| `npm run test:integration` | Tester mot PostgreSQL 18, startar en container med Testcontainers eller använder `TEST_DATABASE_URL` |
+| `npm run db:codegen` | Genererar Kysely-typer från den migrerade databasen |
 
 ## Plan
 
@@ -87,9 +113,9 @@ En översikt över arkitektur och mappstruktur finns i [`docs/architecture.md`](
 
 ### Fas 1: Projektgrund
 
-- [ ] Sätt upp backend, frontend och PostgreSQL med Docker Compose
-- [ ] Lägg till migreringar och testdata
-- [ ] Sätt upp linting, tester och CI i GitHub Actions
+- [x] Sätt upp backend, frontend och PostgreSQL med Docker Compose
+- [x] Lägg till migreringar och testdata
+- [x] Sätt upp linting, tester och CI i GitHub Actions
 
 **Klart när:** projektet startar med ett kommando och CI körs på varje pull request.
 

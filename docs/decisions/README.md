@@ -14,5 +14,6 @@ Varje större tekniskt beslut dokumenteras som en kort ADR enligt mallen i [`000
 | [0008](0008-autentisering-och-behorighet.md) | Egna sessioner i PostgreSQL, `__Host-`-cookie, tre roller | Accepterad |
 | [0009](0009-teststrategi.md) | Vitest mot riktig PostgreSQL via Testcontainers, Playwright för flöden | Accepterad |
 | [0010](0010-personuppgifter.md) | Minimal insamling, export och anonymisering i stället för radering | Accepterad |
+| [0011](0011-typescript-utan-byggsteg.md) | Node kör TypeScript direkt, TypeScript 6 för typkontroll | Accepterad |
 
 Öppna frågor som ännu inte har en ADR: driftsättning (Fas 5) och genomgången av liknande system.

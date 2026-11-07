@@ -1,0 +1,37 @@
+{
+  "name": "erc",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently --names api,web --prefix-colors blue,magenta \"npm run dev -w @erc/api\" \"npm run dev -w @erc/web\"",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:integration": "npm run test:integration -w @erc/api",
+    "db:up": "docker compose up -d --wait db",
+    "db:migrate": "npm run db:migrate -w @erc/api",
+    "db:seed": "npm run db:seed -w @erc/api",
+    "db:codegen": "npm run db:codegen -w @erc/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "concurrently": "10.0.7",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "jiti": "2.7.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}
