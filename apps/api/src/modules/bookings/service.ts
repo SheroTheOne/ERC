@@ -23,6 +23,7 @@ import {
   insertBooking,
   lockBooking,
   lockIdempotencyKey,
+  lockStaffForBooking,
   markCancelled,
   parseStoredBooking,
   saveIdempotencyRecord,
@@ -49,8 +50,9 @@ const STAFF_UNAVAILABLE = new Set(['booking_no_overlap', 'booking_within_open_ho
 
 /**
  * Samtidiga INSERT som krockar i ett EXCLUDE-index kan vänta på varandra och
- * avbrytas med deadlock i stället för 23P01 (ADR-0012). Försöket görs då om i
- * samma savepoint och väntar på den transaktion som överlevde.
+ * avbrytas med deadlock i stället för 23P01 (ADR-0012). Låsen per personal
+ * förhindrar det i den här kodvägen. Om en annan skrivväg ändå orsakar en
+ * deadlock görs försöket om i samma savepoint.
  */
 const DEADLOCK_DETECTED = '40P01';
 const MAX_ATTEMPTS_PER_STAFF = 5;
@@ -125,6 +127,7 @@ export async function createBooking(
           })
         : [input.staffId];
 
+    await lockStaffForBooking(trx, candidates);
     const bookingId = await insertFirstAvailable(trx, candidates, input.staffId === undefined, {
       customerId,
       serviceId: service.id,

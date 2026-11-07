@@ -24,10 +24,10 @@ afterAll(async () => {
   await t.close();
 });
 
-function connect(): Promise<pg.Client> {
+function connect(extraOptions = ''): Promise<pg.Client> {
   const client = new pg.Client({
     connectionString: t.testDb.url,
-    options: '-c search_path=erc,public -c TimeZone=UTC',
+    options: `-c search_path=erc,public -c TimeZone=UTC ${extraOptions}`.trim(),
   });
   return client.connect().then(() => client);
 }
@@ -116,7 +116,11 @@ function postBooking(index: number, staffId?: string) {
 describe(`${CONTENDERS} concurrent bookings of the same slot`, () => {
   it('lets exactly one transaction win at the database level', async () => {
     await clearBookings();
-    const clients = await Promise.all(Array.from({ length: CONTENDERS }, connect));
+    // Rå SQL utan appens lås ger deadlocks (ADR-0012). En kort deadlock_timeout
+    // håller testet snabbt. Den kräver superuser, vilket testservern har.
+    const clients = await Promise.all(
+      Array.from({ length: CONTENDERS }, () => connect('-c deadlock_timeout=50ms')),
+    );
     try {
       const outcomes = await raceBehindBarrier([anna], CONTENDERS, () =>
         Promise.all(
@@ -184,6 +188,7 @@ describe(`${CONTENDERS} concurrent bookings of the same slot`, () => {
     await clearBookings();
     // Spärren håller Annas tid, som prövas först (lika mycket bokat, lägst id).
     // Förlorarna går vidare till Bo i en savepoint. Två personal, två vinnare.
+    // Varje förfrågan väntar antingen på spärrens rad eller på låset för personalen.
     const responses = await raceBehindBarrier([anna], CONTENDERS, () =>
       Promise.all(Array.from({ length: CONTENDERS }, (_, index) => postBooking(index))),
     );

@@ -15,6 +15,23 @@ export async function lockIdempotencyKey(db: Executor, key: string): Promise<voi
   await sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`.execute(db);
 }
 
+/**
+ * Köar bokningsförsök per personal, så att samtidiga INSERT mot samma person inte
+ * hamnar i deadlock i EXCLUDE-indexet (ADR-0012). Låsen tas alltid i id-ordning,
+ * en i taget, så att två transaktioner aldrig kan vänta på varandra i cirkel.
+ * Låsen skyddar inte integriteten, det gör booking_no_overlap.
+ */
+export async function lockStaffForBooking(
+  db: Executor,
+  staffIds: readonly string[],
+): Promise<void> {
+  for (const staffId of [...new Set(staffIds)].sort()) {
+    await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`booking-staff:${staffId}`}, 0))`.execute(
+      db,
+    );
+  }
+}
+
 export interface IdempotencyRecord {
   readonly requestHash: Buffer;
   readonly responseStatus: number;
