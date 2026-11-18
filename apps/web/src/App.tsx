@@ -1,40 +1,26 @@
-import { useEffect, useState } from 'react';
-import { ApiError, api } from './lib/api.ts';
+import { BookingFlow } from './features/booking/BookingFlow.tsx';
+import { api } from './lib/api.ts';
+import { useResource } from './lib/useResource.ts';
 
-type Status =
-  | { readonly state: 'loading' }
-  | { readonly state: 'ok'; readonly time: string }
-  | { readonly state: 'error'; readonly message: string };
+const loadBusiness = () => api.business();
 
 export function App() {
-  const [status, setStatus] = useState<Status>({ state: 'loading' });
-
-  useEffect(() => {
-    let active = true;
-    api
-      .health()
-      .then((health) => {
-        if (active) setStatus({ state: 'ok', time: health.time });
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        const message = error instanceof ApiError ? error.problem.title : 'API:t svarar inte';
-        setStatus({ state: 'error', message });
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const business = useResource(loadBusiness, {});
 
   return (
-    <main>
-      <h1>ERC</h1>
-      <p>Bokningssystem för tjänsteföretag. Bokningsflödet byggs i Fas 4.</p>
-      <p role="status" aria-live="polite">
-        {status.state === 'loading' && 'Kontrollerar API:t …'}
-        {status.state === 'ok' && `API och databas svarar (${status.time}).`}
-        {status.state === 'error' && `Fel: ${status.message}`}
-      </p>
-    </main>
+    <>
+      <header className="site-header">
+        <h1>{business.status === 'ok' ? business.data.name : 'ERC'}</h1>
+      </header>
+      <main>
+        {business.status === 'loading' && <p role="status">Laddar …</p>}
+        {business.status === 'error' && (
+          <p className="notice" role="alert">
+            Bokningen är inte tillgänglig just nu. Försök igen om en stund.
+          </p>
+        )}
+        {business.status === 'ok' && <BookingFlow business={business.data} />}
+      </main>
+    </>
   );
 }

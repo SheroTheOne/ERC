@@ -4,7 +4,7 @@ Ett boknings- och kundhanteringssystem för små tjänsteföretag, till exempel 
 
 Projektet är ett portfolioprojekt med fokus på det som är svårt i riktiga system: datamodellering, samtidighet, behörigheter, tester och driftsättning.
 
-> **Status:** Fas 3 (inloggning och administration) är klar: sessioner, roller, personal, scheman, kunder och en behörighetsmatris som testar varje route. Gränssnittet byggs i Fas 4. Designbeslut finns i [`docs/`](docs/).
+> **Status:** Fas 3 (inloggning och administration) är klar: sessioner, roller, personal, scheman, kunder och en behörighetsmatris som testar varje route. Fas 4 (gränssnitt) pågår: kundens bokningsflöde är klart. Designbeslut finns i [`docs/`](docs/).
 
 ## Mål
 
@@ -137,7 +137,7 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 
 ### Fas 4: Gränssnitt
 
-- [ ] Bygg bokningsflödet för kunder
+- [x] Bygg bokningsflödet för kunder
 - [ ] Bygg kalender och administrationsvyer för personal
 - [ ] Säkerställ att sidorna fungerar på mobil och med tangentbord
 - [ ] Skriv Playwright-tester för de viktigaste flödena

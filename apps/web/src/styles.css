@@ -1,0 +1,277 @@
+/* Mobil först (docs/ux/views.md). Fokus ska alltid synas tydligt. */
+
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --text: #1c1c1a;
+  --muted: #5f5f5a;
+  --border: #d9d9d4;
+  --accent: #1f5f8b;
+  --accent-text: #ffffff;
+  --accent-soft: #e3eef6;
+  --danger: #a1260d;
+  --danger-soft: #fbeae6;
+  --focus: #e8a33d;
+  --radius: 10px;
+
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615;
+    --surface: #222220;
+    --text: #ededea;
+    --muted: #a5a5a0;
+    --border: #3a3a37;
+    --accent: #7fb6dd;
+    --accent-text: #0e2230;
+    --accent-soft: #1d3140;
+    --danger: #f08b73;
+    --danger-soft: #3a1f19;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.site-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+main {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+h2:focus {
+  outline: none;
+}
+
+.step-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.step-heading h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.back {
+  min-width: 2.75rem;
+  padding: 0;
+}
+
+.card-list,
+.slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  text-align: left;
+}
+
+.card-main {
+  display: grid;
+  flex: 1;
+}
+
+.card-title {
+  font-weight: 600;
+}
+
+.card-description,
+.hint,
+.optional {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.card-meta {
+  display: grid;
+  text-align: right;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.chevron {
+  font-size: 1.5rem;
+  color: var(--muted);
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.field [aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.day {
+  display: grid;
+  padding: 0.25rem 0;
+  min-width: 0;
+}
+
+.day-weekday {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.day-number {
+  font-weight: 600;
+}
+
+.day[aria-pressed='true'],
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.day[aria-pressed='true'] .day-weekday {
+  color: inherit;
+}
+
+.slots-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.slot {
+  width: 100%;
+  background: var(--accent-soft);
+  border-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.summary dt {
+  color: var(--muted);
+}
+
+.summary dd {
+  margin: 0;
+}
+
+.primary {
+  width: 100%;
+  font-weight: 600;
+}
