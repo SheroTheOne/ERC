@@ -145,6 +145,23 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 
 **Klart när:** det går att genomföra en bokning från början till slut i webbläsaren.
 
+### Handoff (2026-11-18)
+
+**Klart på grenen `fas-4-granssnitt`:** kundens bokningsflöde (`apps/web/src/features/booking/`) och Playwright-tester för det (`e2e/booking.spec.ts`, mobil och dator), samt ett CI-jobb `e2e`.
+
+**Här slutade arbetet:** avbokningssidan är inte påbörjad i koden. Bara designen nedan är bestämd.
+
+**Nästa steg: kundens sida för att visa och avboka en bokning**
+
+1. Länkformat: `/bokning/<id>#<token>`. Token läggs i fragmentet så att den inte hamnar i serverloggar eller i `Referer`. Detta ska dokumenteras i ADR-0008 och `docs/api/README.md`.
+2. Webben: `App.tsx` matchar `location.pathname` mot `/bokning/:id`. Det finns ingen router-dependency. Vite och API:ts `setNotFoundHandler` serverar redan `index.html` för okända sökvägar.
+3. API-klienten: lägg till `api.booking(id, token)` som anropar `GET /bookings/:id` och `api.cancelBooking(id, token)` som anropar `POST /bookings/:id/cancel`, båda med `Authorization: Bearer <token>`.
+4. Vyn följer `docs/ux/views.md` (Din bokning): tid, tjänst, personal, status och knappen Avboka. Visa "Avbokning senast HH:MM", räknat som `startsAt` minus `business.cancelCutoffMinutes`. Felen ska hanteras så här: `cancellation-window-closed` (409), 404/401 som "Länken är ogiltig eller har gått ut", och redan avbokad bokning som status Avbokad.
+5. Loggmejlaren (`apps/api/src/shared/mailer.ts`) bör logga hela länken (`PUBLIC_ORIGIN/bokning/<id>#<token>`) när `revealTokens` är satt.
+6. E2E-test: token finns bara i mejlet. Boka därför via API:t och lägg sedan in en egen token direkt i `booking_access_token` (`token_hash` = sha256 av token, `expires_at` i framtiden) med `pg` och `DATABASE_URL`, i en hjälpfil `e2e/support/`. Testa visning, avbokning, ogiltig länk och passerad avbokningsgräns.
+
+Därefter kommer personalens dagkalender och administrationsvyer. De kräver inloggning i webben (`POST /auth/login`, cookie).
+
 ### Fas 5: Lansering
 
 - [ ] Skicka bekräftelser via e-post
