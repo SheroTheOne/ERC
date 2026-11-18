@@ -1,7 +1,8 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["es2024", "dom"],
     "types": ["node"]
   },
-  "include": ["eslint.config.ts"]
+  "include": ["eslint.config.ts", "playwright.config.ts", "e2e"]
 }

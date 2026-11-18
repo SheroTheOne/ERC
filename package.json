@@ -12,12 +12,13 @@
   "scripts": {
     "dev": "concurrently --names api,web --prefix-colors blue,magenta \"npm run dev -w @erc/api\" \"npm run dev -w @erc/web\"",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
     "test:integration": "npm run test:integration -w @erc/api --",
+    "test:e2e": "playwright test",
     "db:up": "docker compose up -d --wait db",
     "db:migrate": "npm run db:migrate -w @erc/api",
     "db:seed": "npm run db:seed -w @erc/api",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.56.0",
     "@types/node": "26.6.6",
     "concurrently": "10.0.7",
     "eslint": "10.14.0",

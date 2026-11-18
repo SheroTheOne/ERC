@@ -98,6 +98,7 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 | `npm run lint` / `typecheck` / `format:check` | Statisk kontroll |
 | `npm test` | Enhetstester, ingen databas behövs |
 | `npm run test:integration` | Tester mot PostgreSQL 18, startar en container med Testcontainers eller använder `TEST_DATABASE_URL` |
+| `npm run test:e2e` | Playwright i mobil- och datorvy. Kräver migrerad databas med demodata, startar API och webb om de inte redan körs (första gången: `npx playwright install chromium`) |
 | `npm run db:codegen` | Genererar Kysely-typer från den migrerade databasen |
 
 ## Plan
@@ -140,7 +141,7 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 - [x] Bygg bokningsflödet för kunder
 - [ ] Bygg kalender och administrationsvyer för personal
 - [ ] Säkerställ att sidorna fungerar på mobil och med tangentbord
-- [ ] Skriv Playwright-tester för de viktigaste flödena
+- [ ] Skriv Playwright-tester för de viktigaste flödena (kundens bokning klar)
 
 **Klart när:** det går att genomföra en bokning från början till slut i webbläsaren.
 

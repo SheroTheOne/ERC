@@ -32,7 +32,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['apps/api/**/*.ts', 'packages/**/*.ts', '*.ts'],
+    files: ['apps/api/**/*.ts', 'packages/**/*.ts', 'e2e/**/*.ts', '*.ts'],
     languageOptions: { globals: globals.node },
   },
   {
