@@ -151,6 +151,8 @@ npm run dev                      # API på :3000, webb på http://localhost:5173
 
 **Här slutade arbetet:** avbokningssidan är inte påbörjad i koden. Bara designen nedan är bestämd.
 
+**CI är rött, åtgärda först:** i körningen för `7499334` gick format/lint/typer, integrationstester och Docker igenom. Jobbet `e2e` föll redan i steget `npx playwright install --with-deps chromium`, så testerna kördes aldrig. Trolig orsak: `ubuntu-latest` flyttas till Ubuntu 26, som Playwright 1.56 inte stöder. Läs loggen på GitHub för att bekräfta. Åtgärda sedan genom att sätta `runs-on: ubuntu-24.04` i e2e-jobbet eller uppgradera `@playwright/test`. Lokalt går alla 10 e2e-tester igenom.
+
 **Nästa steg: kundens sida för att visa och avboka en bokning**
 
 1. Länkformat: `/bokning/<id>#<token>`. Token läggs i fragmentet så att den inte hamnar i serverloggar eller i `Referer`. Detta ska dokumenteras i ADR-0008 och `docs/api/README.md`.
